@@ -144,8 +144,8 @@ void loop(void){
     time_now_dht = millis();
 
     // retrive temprature and humidity from dht22
-    float h = dht.getHumidity();
-    float t = dht.getTemperature();
+    h = dht.getHumidity();
+    t = dht.getTemperature();
 
     // debug hum and temp
     Serial.print("{\"humidity\": ");
