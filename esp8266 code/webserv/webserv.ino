@@ -9,8 +9,13 @@
 #include "Adafruit_MQTT_Client.h"
 
 // ds18b20 and DHT22 one wire communication wires
-#define ONE_WIRE_PIN_DS 2 // d4
-#define ONE_WIRE_PIN_DHT 0 // d3
+//#ifdef DS_SENSOR
+//# define ONE_WIRE_PIN_DHT 0 // d3
+//# define ONE_WIRE_PIN_DS 2 // d4
+//#else
+# define ONE_WIRE_PIN_DHT 2 // d4
+# define POWER_PIN_DHT 0 // d3
+//#endif  
 
 // wifi connection
 #define WIFI_SSID "homem1"
@@ -21,6 +26,8 @@
 #define AIO_SERVERPORT  1883                   // use 8883 for SSL
 #define AIO_USERNAME    "vladi"
 #define AIO_KEY         ""
+#define AIO_CHANNEL     "domoticz/in"
+#define AIO_IDX         43
 
 // set dhtesp communication to dht
 DHTesp dht;
@@ -31,9 +38,9 @@ WiFiClient client;
 // Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
 Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
 
-// Setup a feed called sensor1 for publishing.
+// Setup a feed called mqtt_channel for publishing.
 // Notice MQTT paths for domoticz follows: domoticz/<in or out>
-Adafruit_MQTT_Publish sensor1 = Adafruit_MQTT_Publish(&mqtt, "domoticz/in");
+Adafruit_MQTT_Publish mqtt_channel = Adafruit_MQTT_Publish(&mqtt, AIO_CHANNEL);
 
 // Setup a feed called 'onoff' for subscribing to changes.
 Adafruit_MQTT_Subscribe onoffbutton = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/switch_vlad");
@@ -41,19 +48,20 @@ Adafruit_MQTT_Subscribe onoffbutton = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAM
 // setup webserver
 ESP8266WebServer webserver(80);
 
-// sets up one wire communication with ds pin
-OneWire oneWire_ds(ONE_WIRE_PIN_DS);
-
 // setsup the ds18b20 on the onewire communication
+//define DS_SENSOR 1
+#ifdef DS_SENSOR
+OneWire oneWire_ds(ONE_WIRE_PIN_DS);
 DallasTemperature ds_sensor(&oneWire_ds);
+#endif 
 
 // time keeping variables
 int period_ds = 60000;
-int time_now_ds = 0;
+int time_now_ds = 00000;
 int period_dht = 60000;
-int time_now_dht = 0;
+int time_now_dht = 00000;
 
-// setsup debug values that are impossible for ds_sensor used
+// setsup debug values that are impossible for ds18b20 and dht22
 float temp_ds = -120;
 String dis_temp_ds = "-20";
 float h = -50;
@@ -85,14 +93,20 @@ void readCurrent() {
   webserver.send(200, "text/plain", dis);
 }
 
+
 void dht22() {
   webserver.send(200, "text/plain", "Temprature: " + String(t) + " Humidity: " + String(h));
 }
 
+
 void dsCurrent() {
+#ifdef DS_SENSOR  
   // reads ds and publishes to web page
   ds_sensor.requestTemperatures();
   float temp = ds_sensor.getTempCByIndex(0);
+#else 
+  float temp = -66.6;
+#endif  
   webserver.send(200, "text/plain", String(temp));
 }
 
@@ -101,7 +115,64 @@ void notfoundPage(){
   webserver.send(404, "text/plain", "404: Not found"); 
 }
 
+void publish_mqtt(int idx, float temp, float humidity = -1) 
+{
+  // debug hum and temp
+  Serial.print("{");
+  if (humidity > 0) {
+    Serial.print("\"humidity\": ");
+    Serial.print(humidity);
+    Serial.print(", ");
+  }
+  Serial.print("\"temp\": ");
+  Serial.print(temp);
+  Serial.print("}\n");
+    
+  // format into domoticz readable format
+  String dis_temp_dht = "{\"idx\":";
+  dis_temp_dht += String(idx);
+  dis_temp_dht += ", \"nvalue\":0, \"svalue\":\"";
+  dis_temp_dht += String(temp);
+  if (humidity > 0) {
+    dis_temp_dht += ";";
+    dis_temp_dht += String(humidity);
+    dis_temp_dht += ";";
+    dis_temp_dht += "1";
+  }
+  dis_temp_dht += "\"}";
+
+  Serial.print(dis_temp_dht);
+
+  // turns things into a char array to be used for domoticz
+  char char_temp[50];
+  //sprintf(char_temp,"{\"idx\":43, \"nvalue\":0, \"svalue\":\"%.2f\"} ", temp);
+  dis_temp_dht.toCharArray(char_temp, 50);
+
+  // will publish the temprature and return if they have published it to location
+  if (! mqtt_channel.publish(char_temp)) {
+    Serial.println(F("Failed"));
+  } else {
+    Serial.println(F("OK!"));
+  }
+}
+
+void web_publish_mqtt() {
+  h = dht.getHumidity();
+  t = dht.getTemperature();
+  publish_mqtt(AIO_IDX, t, h);
+  char dis[64];
+  sprintf(dis, "temp: %f humidity: %f idx: %d", t, h, 43);
+  
+  webserver.send(200, "text/plain", dis);
+}
+
 void setup() {
+
+  #ifndef DS_SENSOR
+  digitalWrite(POWER_PIN_DHT, HIGH);
+  pinMode(POWER_PIN_DHT, OUTPUT);
+  #endif
+  
   // initialise the serrial connection
   Serial.begin(115200);
   Serial.println();
@@ -120,10 +191,15 @@ void setup() {
 
   // web pages displayed on request
   webserver.on("/", rootPage);
+  
+  #ifdef DS_SENSOR
   webserver.on("/ds", readTemp);
+  webserver.on("/current_ds", dsCurrent);
+  #endif
+  
   webserver.on("/dht", dht22);
   webserver.on("/current_dht", readCurrent);
-  webserver.on("/current_ds", dsCurrent);
+  webserver.on("/publish", web_publish_mqtt);
 
   // web page not found web page
   webserver.onNotFound(notfoundPage);
@@ -136,6 +212,13 @@ void setup() {
 }
 
 void loop(void){ 
+
+  
+  // Ensure the connection to the MQTT server is alive (this will make the first
+  // connection and automatically reconnect when disconnected).  See the MQTT_connect
+  // function definition further below.
+  MQTT_connect();
+  
   // begins webserver clients
   webserver.handleClient();
 
@@ -147,37 +230,11 @@ void loop(void){
     h = dht.getHumidity();
     t = dht.getTemperature();
 
-    // debug hum and temp
-    Serial.print("{\"humidity\": ");
-    Serial.print(h);
-    Serial.print(", \"temp\": ");
-    Serial.print(t);
-    Serial.print("}\n");
-    
-    // format into domoticz readable format
-    String dis_temp_dht = "{\"idx\":43, \"nvalue\":0, \"svalue\":\"";
-    dis_temp_dht += String(t);
-    dis_temp_dht += ";";
-    dis_temp_dht += String(h);
-    dis_temp_dht += ";";
-    dis_temp_dht += "1";
-    dis_temp_dht += "\"}";
-
-    Serial.print(dis_temp_dht);
-
-    // turns things into a char array to be used for domoticz
-    char char_temp[50];
-    //sprintf(char_temp,"{\"idx\":43, \"nvalue\":0, \"svalue\":\"%.2f\"} ", temp);
-    dis_temp_dht.toCharArray(char_temp, 50);
-
-    // will publish the temprature and return if they have published it to location
-    if (! sensor1.publish(char_temp)) {
-      Serial.println(F("Failed"));
-    } else {
-      Serial.println(F("OK!"));
-    }
+    // publlishes and debug values temp and humidity optionaly
+    publish_mqtt(AIO_IDX, t, h);
   }
-
+  
+  #ifdef DS_SENSOR
   // if enough time has passed it will send an update to domoticz from the ds18b20 sensor
   if (millis() - time_now_ds > period_ds) {
     // updates last time the temprature is checked
@@ -186,32 +243,11 @@ void loop(void){
     // gets current sensor values and sets the temprature under the variable temp
     ds_sensor.requestTemperatures();
     temp_ds = ds_sensor.getTempCByIndex(0);
-
-    Serial.println(temp_ds);
-
-    // formats the current temprature into a domoticz readable format
-    // idx 42 is identification used in place of sensor1 or themal sensor
-    dis_temp_ds = "{\"idx\":42, \"nvalue\":0, \"svalue\":\"";
-    dis_temp_ds += String(temp_ds);
-    dis_temp_ds += "\"}";
-
-    // turns things into a char array to be used for domoticz
-    char char_temp[50];
-    //sprintf(char_temp,"{\"idx\":42, \"nvalue\":0, \"svalue\":\"%.2f\"} ", temp);
-    dis_temp_ds.toCharArray(char_temp, 50);
-
-    // will publish the temprature and return if they have published it to location
-    if (! sensor1.publish(char_temp)) {
-      Serial.println(F("Failed"));
-    } else {
-      Serial.println(F("OK!"));
-    }
+    
+    int index = 42;
+    publish_mqtt(index, temp_ds);
   }
-
-  // Ensure the connection to the MQTT server is alive (this will make the first
-  // connection and automatically reconnect when disconnected).  See the MQTT_connect
-  // function definition further below.
-  MQTT_connect();
+  #endif
 
   //Adafruit_MQTT_Subscribe *subscription;
   //while ((subscription = mqtt.readSubscription(5000))) {
