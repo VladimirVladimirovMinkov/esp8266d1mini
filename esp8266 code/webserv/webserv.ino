@@ -1,21 +1,36 @@
+bool ds = false;
+bool dht = false;
+bool bme = true;
+
 // libaries used
 #include <dummy.h>
+
+#if dht
 #include <DHTesp.h>
+// set dhtesp communication to dht
+DHTesp dht;
+#endif
+
+#include <OneWire.h>
+
+#if ds
+#include <DallasTemperature.h>
+#endif
+
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
 #include "Adafruit_MQTT.h"
 #include "Adafruit_MQTT_Client.h"
 
 // ds18b20 and DHT22 one wire communication wires
-//#ifdef DS_SENSOR
-//# define ONE_WIRE_PIN_DHT 0 // d3
-//# define ONE_WIRE_PIN_DS 2 // d4
-//#else
+#if ds
+# define ONE_WIRE_PIN_DS 2 // d4
+#endif
+
+#if dht
 # define ONE_WIRE_PIN_DHT 2 // d4
 # define POWER_PIN_DHT 0 // d3
-//#endif  
+#endif
 
 // wifi connection
 #define WIFI_SSID "homem1"
@@ -28,9 +43,6 @@
 #define AIO_KEY         ""
 #define AIO_CHANNEL     "domoticz/in"
 #define AIO_IDX         43
-
-// set dhtesp communication to dht
-DHTesp dht;
 
 // Create an ESP8266 WiFiClient class to connect to the MQTT server.
 WiFiClient client;
@@ -73,11 +85,18 @@ void rootPage() {
   // creates the home page
   String res; 
   res += "Vlad Api \n";
+  #if dht
   res += "/current_dht \n";
+  res += "/dht \n";
+  #endif
+  #if ds
   res += "/current_ds \n";
   res += "/ds \n";
-  res += "/dht \n";
+  #endif
+  #if bme
+  res += "/bme \n";
   webserver.send(200, "text/plain", res);
+  #endif
 }
 
 void readTemp() { 
@@ -85,6 +104,7 @@ void readTemp() {
   webserver.send(200, "text/plain", "temprature " + String(temp_ds));
 }
 
+#if dht
 void readCurrent() { 
   // gets current temprature and humidity and publishes it to web page
   h = dht.getHumidity();
@@ -92,6 +112,7 @@ void readCurrent() {
   String dis = "Temprature: " + String(t) + " Humidity: " + String(h); 
   webserver.send(200, "text/plain", dis);
 }
+#endif
 
 
 void dht22() {
@@ -103,7 +124,7 @@ void dsCurrent() {
 #ifdef DS_SENSOR  
   // reads ds and publishes to web page
   ds_sensor.requestTemperatures();
-  float temp = ds_sensor.getTempCByIndex(0);
+  float temp = ds_sensor.getTempCByIndex(0); 
 #else 
   float temp = -66.6;
 #endif  
@@ -156,6 +177,7 @@ void publish_mqtt(int idx, float temp, float humidity = -1)
   }
 }
 
+#if dht
 void web_publish_mqtt() {
   h = dht.getHumidity();
   t = dht.getTemperature();
@@ -165,20 +187,21 @@ void web_publish_mqtt() {
   
   webserver.send(200, "text/plain", dis);
 }
+#endif
 
 void setup() {
 
-  #ifndef DS_SENSOR
+  #if dht
   digitalWrite(POWER_PIN_DHT, HIGH);
   pinMode(POWER_PIN_DHT, OUTPUT);
-  #endif
-  
-  // initialise the serrial connection
-  Serial.begin(115200);
-  Serial.println();
 
   // setup pin communication
   dht.setup(ONE_WIRE_PIN_DHT, DHTesp::DHT22);
+  #endif
+  
+  // initialise the serrial connection
+  Serial.begin(9600);
+  Serial.println();
 
   // sets up the wifi connection
   WiFi.begin(WIFI_SSID, WIFI_PASS);
@@ -192,14 +215,16 @@ void setup() {
   // web pages displayed on request
   webserver.on("/", rootPage);
   
-  #ifdef DS_SENSOR
+  #if ds
   webserver.on("/ds", readTemp);
   webserver.on("/current_ds", dsCurrent);
   #endif
-  
+
+  #if dht
   webserver.on("/dht", dht22);
   webserver.on("/current_dht", readCurrent);
   webserver.on("/publish", web_publish_mqtt);
+  #endif
 
   // web page not found web page
   webserver.onNotFound(notfoundPage);
@@ -212,7 +237,6 @@ void setup() {
 }
 
 void loop(void){ 
-
   
   // Ensure the connection to the MQTT server is alive (this will make the first
   // connection and automatically reconnect when disconnected).  See the MQTT_connect
@@ -222,6 +246,7 @@ void loop(void){
   // begins webserver clients
   webserver.handleClient();
 
+  #if dht
   // if enough time has passed it will send an update to domoticz from the dht22 sensor
   if (millis() - time_now_dht > period_dht) {
     time_now_dht = millis();
@@ -233,6 +258,7 @@ void loop(void){
     // publlishes and debug values temp and humidity optionaly
     publish_mqtt(AIO_IDX, t, h);
   }
+  #endif
   
   #ifdef DS_SENSOR
   // if enough time has passed it will send an update to domoticz from the ds18b20 sensor
