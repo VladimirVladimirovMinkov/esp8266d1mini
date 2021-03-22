@@ -12,20 +12,18 @@ bool bme_en = false;
 
 // enable/dissable librarries
 
-#if dht_en
 #include <DHTesp.h>
 // setup dht to esp communication
 DHTesp dht;
-#endif
 
-#if ds_en
+
 #include <DallasTemperature.h>
 #define ONE_WIRE_PIN_DS 2 // d4
 OneWire oneWire_ds(ONE_WIRE_PIN_DS);
 DallasTemperature ds_sensor(&oneWire_ds);
-#endif
 
-#if bme_en
+
+
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
@@ -40,7 +38,6 @@ DallasTemperature ds_sensor(&oneWire_ds);
 Adafruit_BME280 bme; // I2C
 
 unsigned long delayTime;
-#endif
 
 // wifi connection
 #define WIFI_SSID "homem1"
@@ -70,26 +67,20 @@ Adafruit_MQTT_Subscribe onoffbutton = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAM
 // setup webserver
 ESP8266WebServer webserver(80);
 
-#if ds_en
 int period_ds = 60000;
 int time_now_ds = 00000;
-float temp_ds = -120.0
-#endif
+float temp_ds = -120.0;
 
-#if dht_en
 int period_dht = 60000;
 int time_now_dht = 00000;
-float temp_dht = -110.9
-float humid_dht = -1.1
-#endif
+float temp_dht = -110.9;
+float humid_dht = -1.1;
 
-#if bme_en
 int period_bme = 60000;
 int time_now_bme = 00000;
-float temp_bme = -110
-float humid_bme = -1.2
-float pressure_bme = -1.0
-#endif
+float temp_bme = -110;
+float humid_bme = -1.2;
+float pressure_bme = -1.0;
 
 void MQTT_connect();
 
@@ -97,32 +88,61 @@ void rootPage() {
   // creates the home page
   String res; 
   res += "Vlad Api \n";
-  
-  #if dht_en
-  res += "/current_dht \n";
-  res += "/dht \n";
-  #endif
-  
-  #if ds_en
+
+  if (dht_en) {
+    res += "/current_dht \n";
+    res += "/dht \n";
+  }
+
+  if (ds_en) {
   res += "/current_ds \n";
   res += "/ds \n";
-  #endif
-  
-  #if bme_en
-  res += "/current_bme \n"
+  }
+
+  if (bme_en) {
+  res += "/current_bme \n";
   res += "/bme \n";
-  #endif
+  }
   
   webserver.send(200, "text/plain", res);
 }
 
-void dsTemp() { 
-  // publishes the cached temprature from ds
-  webserver.send(200, "text/plain", "temprature " + String(temp_ds));
+void readDHT() { 
+  // gets current temprature and humidity and publishes it to web page
+  h = dht.getHumidity();
+  t = dht.getTemperature();
+  String dis = "Temprature: " + String(t) + " Humidity: " + String(h); 
+  webserver.send(200, "text/plain", dis);
+}
+
+void readDS() { 
+  // gets current temprature and publishes it to web page
+  ds_sensor.requestTemperatures();
+  t = ds_sensor.requestTemperatures();
+  String dis = "Temprature: " + String(t); 
+  webserver.send(200, "text/plain", dis);
+}
+
+void readBME() { 
+  // gets current temprature and humidity and publishes it to web page
+  h = 
+  t = 
+  p = 
+  String dis = "Temprature: " + String(t) + " Humidity: " + String(h) + " Pressure" + String(p);
+  webserver.send(200, "text/plain", dis);
 }
 
 void setup() {
+  Serial.begin(9600);
+  Serial.println(F("BME280 test"));
 
+  bool status = false;
+  
+  while (!status) {
+	status = bme.begin(0x76);
+    Serial.println("Could not find a valid BME280 sensor, check wiring!");
+    //while (1);
+  }
 }
 
 void loop() {
