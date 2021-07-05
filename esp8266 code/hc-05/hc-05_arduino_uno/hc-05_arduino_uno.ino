@@ -14,20 +14,20 @@ void setup()
 void loop() 
 { 
  //from bluetooth to Terminal. 
- if (RCcar.available())
+ if (RCcar.available()) {
    holder = RCcar.read();
    Remote.write(holder);
    Serial.write(holder);
- //delay(1);
+ }
  //from termial to bluetooth 
- if (Remote.available())
+ if (Remote.available()) {
    holder = Remote.read();
    RCcar.write(holder);
    Serial.write(holder);
- //delay(1);
- if (Serial.available())
+ }
+ if (Serial.available()) {
    holder = Serial.read();
    RCcar.write(holder);
    Remote.write(holder);
- //delay(1);
+ }
 }
