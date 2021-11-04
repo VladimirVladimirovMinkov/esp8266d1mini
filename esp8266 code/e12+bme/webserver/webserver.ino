@@ -1,65 +1,58 @@
-#include <Wire.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BME280.h>
+// esp wifi and webserver get
+#include <ESP8266WebServer.h>
 
-#include <SPI.h>
-//#define BME_SCK 14
-//#define BME_MISO 12
-//#define BME_MOSI 13
-//#define BME_CS 15
+// wifi connection
+#define WIFI_SSID "homem1"
+#define WIFI_PASS "Yanaminkovladkodestroytheworld1"
 
-#define SEALEVELPRESSURE_HPA (1013.25)
+// setup webserver
+ESP8266WebServer webserver(80);
 
-Adafruit_BME280 bme; // I2C
+void rootPage() {
+  // creates the home page
+  String res; 
+  res += "Vlad API \n";
+  webserver.send(200, "text/plain", res);
+}
 
-unsigned long delayTime;
+void rootPage2() {
+  // creates the home page
+  String res; 
+  res += "<h1>Vlad API<h1> \n";
+  webserver.send(200, "text/html", res);
+}
+
+void notfoundPage(){
+  // a debug message to know that this is not a page that exsists
+  webserver.send(404, "text/plain", "404: Not found"); 
+}
 
 void setup() {
+  // initialise the serrial connection
   Serial.begin(9600);
-  Serial.println(F("BME280 test"));
-
-  bool status;
-
-  // default settings
-// (you can also pass in a Wire library object like &Wire2)
-  status = bme.begin(0x76);  
-  if (!status) {
-    Serial.println("Could not find a valid BME280 sensor, check wiring!");
-    //while (1);
-  }
-
-  Serial.println("-- Default Test --");
-  delayTime = 1000;
-
   Serial.println();
+
+  // sets up the wifi connection
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  while (WiFi.status() != WL_CONNECTED) { delay(100); }
+
+  // debug messages to show wifi connection is running properly
+  Serial.println(F("webserver test demo"));
+  Serial.print("Connected! IP address: ");
+  Serial.println(WiFi.localIP());
+
+  // web pages displayed on request
+  webserver.on("/", rootPage);
+  webserver.on("/alt", rootPage2);
+
+  // web page not found web page
+  webserver.onNotFound(notfoundPage);
+
+  // begins the web server
+  webserver.begin();
 }
 
-void loop() { 
-  printValues();
-  delay(delayTime);
-}
-
-void printValues() {
-  Serial.print("Temperature = ");
-  Serial.print(bme.readTemperature());
-  Serial.println(" *C");
-  
-  // Convert temperature to Fahrenheit
-  /*Serial.print("Temperature = ");
-  Serial.print(1.8 * bme.readTemperature() + 32);
-  Serial.println(" *F");*/
-  
-  Serial.print("Pressure = ");
-  Serial.print(bme.readPressure() / 100.0F);
-  Serial.println(" hPa");
-
-  Serial.print("Approx. Altitude = ");
-  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
-  Serial.println(" m");
-
-  Serial.print("Humidity = ");
-  Serial.print(bme.readHumidity());
-  Serial.println(" %");
-
-  Serial.println();
+void loop(void){
+  // begins webserver clients
+  webserver.handleClient();
 }
