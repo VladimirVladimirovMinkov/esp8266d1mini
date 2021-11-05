@@ -40,7 +40,7 @@ R"=====(
     let m3 = ' The code syntax of JavaScript is similar to C++.'
     function JS1()
     {
-      alert(m1 + m2 + m3);
+	  alert(6);
     }
     //function prompts for name, then displays message
     function JS2()
