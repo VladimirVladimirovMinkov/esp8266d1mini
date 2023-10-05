@@ -38,11 +38,8 @@ void setup()
 
 void loop()
 {
-  static uint32_t start = 0;
   int sleep = 1;
   static bool go = false;
-  
-  if (!start) start = millis();
 
   if (wav[0]->isRunning()) {
     if (!wav[0]->loop()) { wav[0]->stop(); stub[0]->stop(); }
@@ -50,12 +47,11 @@ void loop()
 
   if (digitalRead(4) == 0)
   {
-    start = millis();
     sleep = sleep*4;
     if (sleep > 3600) sleep = 1;
   }
 
-  if (millis()-start > 3000) {
+  if (millis() > 5000) {
     if (!go) {
       // defines viola.h for playing 
       stub[1] = mixer->NewInput();
@@ -77,7 +73,7 @@ void loop()
       delay(100);
 
       // restarts the esp after x amount of microseconds or 1^-6 seconds
-      ESP.deepSleep(sleep * 5e6); 
+      ESP.deepSleep(sleep * 1e6);
     }
   }
 }
