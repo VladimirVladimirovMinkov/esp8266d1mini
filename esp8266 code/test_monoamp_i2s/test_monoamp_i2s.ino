@@ -20,7 +20,7 @@ int sleep = -1;
 #define btn_input 5   // D1
 #define btn_output 0  // D3
 #define amp_sd 14     // D5
-#define indicatorLED 12  // D6
+#define indicatorLED 13  // D7
 
 void setup() {
   Serial.begin(74880);
@@ -81,6 +81,10 @@ void loop() {
     delay(10);
     
     EEPROM.commit();
+
+    pinMode(amp_sd, OUTPUT);
+    delay(100);
+    digitalWrite(amp_sd, LOW);
     
     for (int i = 0; i < sleep; i++)
     {
