@@ -17,8 +17,8 @@ AudioOutputMixer *mixer;
 AudioOutputMixerStub *stub[2];
 
 int sleep = -1;
-#define btn_input 5   // D1
-#define btn_output 0  // D3
+#define btn_input 0   // D1
+#define btn_output 5  // D3
 #define amp_sd 14     // D5
 #define indicatorLED 02  // D7
 #define RTC_D0_GPIO16 16 //D0
