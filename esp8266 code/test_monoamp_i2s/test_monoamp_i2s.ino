@@ -121,13 +121,16 @@ void loop() {
     wav[0]->stop();
     
 #if 1
+
     pinMode(indicatorLED, OUTPUT);
+    digitalWrite(indicatorLED, HIGH);
+    delay(500);
     for (int i = 0; i < sleep; i++)
     {
-      digitalWrite(indicatorLED, HIGH);
-      delay(100);
       digitalWrite(indicatorLED, LOW);
-      delay(100);
+      delay(250);
+      digitalWrite(indicatorLED, HIGH);
+      delay(250);
     }
     pinMode(indicatorLED, INPUT);
 #endif     
