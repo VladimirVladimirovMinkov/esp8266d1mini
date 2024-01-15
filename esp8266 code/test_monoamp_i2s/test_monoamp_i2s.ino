@@ -8,7 +8,7 @@
 #include "AudioOutputI2S.h"
 #include "AudioOutputMixer.h"
 
-#include "viola.h"
+#include "MouseSounds.h"
 
 AudioGeneratorWAV *wav[2];
 AudioFileSourcePROGMEM *file[2];
