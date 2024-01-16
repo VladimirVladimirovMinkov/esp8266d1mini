@@ -4,13 +4,13 @@
 #include <ESP_EEPROM.h>
 
 #include "AudioFileSourcePROGMEM.h"
-#include "AudioGeneratorWAV.h"
+#include "AudioGeneratorMP3.h"
 #include "AudioOutputI2S.h"
 #include "AudioOutputMixer.h"
 
 #include "MouseSounds.h"
 
-AudioGeneratorWAV *wav;
+AudioGeneratorMP3 *mp3;
 AudioFileSourcePROGMEM *file;
 AudioOutputI2S *out;
 AudioOutputMixer *mixer;
@@ -68,8 +68,8 @@ void setup() {
   mixer = new AudioOutputMixer(32, out);
   stub = mixer->NewInput();
   stub->SetGain(0.3);
-  wav = new AudioGeneratorWAV();
-  wav->begin(file, stub);
+  mp3 = new AudioGeneratorMP3();
+  mp3->begin(file, stub);
 
   EEPROM.get(0, sleep);
   
@@ -89,10 +89,10 @@ void setup() {
 void loop() {
   bool go = false;
 
-  if (wav->isRunning()) {
+  if (mp3->isRunning()) {
     go = true;
-    if (!wav->loop()) {
-      wav->stop();
+    if (!mp3->loop()) {
+      mp3->stop();
       stub->stop();
       go = false;
     }
@@ -118,10 +118,10 @@ void loop() {
     pinMode(amp_sd, OUTPUT);
     //delay(100);
     digitalWrite(amp_sd, LOW);
-    wav->stop();
+    mp3->stop();
     
 #if 1
-
+    
     pinMode(indicatorLED, OUTPUT);
     digitalWrite(indicatorLED, HIGH);
     delay(500);
@@ -136,14 +136,14 @@ void loop() {
 #endif     
   }
 
-  if ((millis() > 5000) || (go == false)) {
+  if ((millis() > 20000) || (go == false)) {
     // shuts down amplifier
     pinMode(amp_sd, OUTPUT);
     //delay(100);
     digitalWrite(amp_sd, LOW);
     //delay(100);
-    // restarts the esp after x amount of microseconds or 1^-6 seconds
-  #if 1 
+    // rest arts the esp after x amount of microseconds or 1^-6 seconds
+  #if 1
     //in minutes 
     ESP.deepSleep(sleep * 60e6, RF_DISABLED);
   #else
